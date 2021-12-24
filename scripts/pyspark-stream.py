@@ -1,28 +1,26 @@
-import sys
+import os
 
+os.chdir('../')
 import findspark
 
 findspark.init()
 findspark.find()
-import pyspark
-
-findspark.find()
 
 from pyspark.sql import SparkSession
 
-from pyspark.sql.functions import from_json
+# Spark session & context
+spark = (SparkSession
+         .builder
+         .master('local')
+         .appName('transactions-consumer')
+         # Add kafka package
+         .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2")
+         .getOrCreate())
+
+from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, BooleanType, LongType, IntegerType, TimestampType, DoubleType, \
     StringType
-from pyspark.ml import PipelineModel
-
-from pyspark.sql.functions import col
-
-import pickle
-import os
-
-os.chdir('../')
-
-
+from pyspark.ml.tuning import CrossValidatorModel
 
 features = ['TX_AMOUNT', 'TX_DURING_NIGHT', 'TX_DURING_WEEKEND', 'CUSTOMER_ID_AVG_AMOUNT_1DAY_WINDOW',
             'CUSTOMER_ID_AVG_AMOUNT_7DAY_WINDOW', 'CUSTOMER_ID_AVG_AMOUNT_30DAY_WINDOW',
@@ -30,16 +28,15 @@ features = ['TX_AMOUNT', 'TX_DURING_NIGHT', 'TX_DURING_WEEKEND', 'CUSTOMER_ID_AV
             'TERMINAL_ID_NB_TX_1DAY_WINDOW', 'TERMINAL_ID_NB_TX_7DAY_WINDOW', 'TERMINAL_ID_NB_TX_30DAY_WINDOW',
             'TERMINAL_ID_RISK_1DAY_WINDOW', 'TERMINAL_ID_RISK_7DAY_WINDOW', 'TERMINAL_ID_RISK_30DAY_WINDOW']
 
-
 if __name__ == '__main__':
-    # Spark session & context
-    spark = (SparkSession
-             .builder
-             .master('local')
-             .appName('transactions-consumer')
-             # Add kafka package
-             .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2")
-             .getOrCreate())
+    # # Spark session & context
+    # spark = (SparkSession
+    #          .builder
+    #          .master('local')
+    #          .appName('transactions-consumer')
+    #          # Add kafka package
+    #          .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2")
+    #          .getOrCreate())
     # sc = spark.sparkContext
     # # sqlContext = SQLContext(sc)
 
@@ -74,12 +71,12 @@ if __name__ == '__main__':
             StructField("CUSTOMER_ID_NB_TX_1DAY_WINDOW", LongType(), nullable=True),
             StructField("CUSTOMER_ID_NB_TX_7DAY_WINDOW", LongType(), nullable=True),
             StructField("CUSTOMER_ID_NB_TX_30DAY_WINDOW", LongType(), nullable=True),
-            StructField("TERMINAL_ID_NB_TX_1DAY_WINDOW", LongType(), nullable=True),
-            StructField("TERMINAL_ID_NB_TX_7DAY_WINDOW", LongType(), nullable=True),
-            StructField("TERMINAL_ID_NB_TX_30DAY_WINDOW", LongType(), nullable=True),
-            StructField("TERMINAL_ID_RISK_1DAY_WINDOW", DoubleType(), nullable=True),
-            StructField("TERMINAL_ID_RISK_7DAY_WINDOW", DoubleType(), nullable=True),
-            StructField("TERMINAL_ID_RISK_30DAY_WINDOW", DoubleType(), nullable=True)
+            StructField("CUSTOMER_ID_TERMINAL_ID_NB_TX_1DAY_WINDOW", LongType(), nullable=True),
+            StructField("CUSTOMER_ID_TERMINAL_ID_NB_TX_7DAY_WINDOW", LongType(), nullable=True),
+            StructField("CUSTOMER_ID_TERMINAL_ID_NB_TX_30DAY_WINDOW", LongType(), nullable=True),
+            StructField("CUSTOMER_ID_MAX_AMOUNT_1DAY_WINDOW", DoubleType(), nullable=True),
+            StructField("CUSTOMER_ID_MAX_AMOUNT_7DAY_WINDOW", DoubleType(), nullable=True),
+            StructField("CUSTOMER_ID_MAX_AMOUNT_30DAY_WINDOW", DoubleType(), nullable=True)
         ]
     )
 
@@ -102,16 +99,17 @@ if __name__ == '__main__':
         col("value.CUSTOMER_ID_NB_TX_1DAY_WINDOW").alias("CUSTOMER_ID_NB_TX_1DAY_WINDOW"),
         col("value.CUSTOMER_ID_NB_TX_7DAY_WINDOW").alias("CUSTOMER_ID_NB_TX_7DAY_WINDOW"),
         col("value.CUSTOMER_ID_NB_TX_30DAY_WINDOW").alias("CUSTOMER_ID_NB_TX_30DAY_WINDOW"),
-        col("value.TERMINAL_ID_NB_TX_1DAY_WINDOW").alias("TERMINAL_ID_NB_TX_1DAY_WINDOW"),
-        col("value.TERMINAL_ID_NB_TX_7DAY_WINDOW").alias("TERMINAL_ID_NB_TX_7DAY_WINDOW"),
-        col("value.TERMINAL_ID_NB_TX_30DAY_WINDOW").alias("TERMINAL_ID_NB_TX_30DAY_WINDOW"),
-        col("value.TERMINAL_ID_RISK_1DAY_WINDOW").alias("TERMINAL_ID_RISK_1DAY_WINDOW"),
-        col("value.TERMINAL_ID_RISK_7DAY_WINDOW").alias("TERMINAL_ID_RISK_7DAY_WINDOW"),
-        col("value.TERMINAL_ID_RISK_30DAY_WINDOW").alias("TERMINAL_ID_RISK_30DAY_WINDOW")
+        col("value.CUSTOMER_ID_TERMINAL_ID_NB_TX_1DAY_WINDOW").alias("CUSTOMER_ID_TERMINAL_ID_NB_TX_1DAY_WINDOW"),
+        col("value.CUSTOMER_ID_TERMINAL_ID_NB_TX_7DAY_WINDOW").alias("CUSTOMER_ID_TERMINAL_ID_NB_TX_7DAY_WINDOW"),
+        col("value.CUSTOMER_ID_TERMINAL_ID_NB_TX_30DAY_WINDOW").alias("CUSTOMER_ID_TERMINAL_ID_NB_TX_30DAY_WINDOW"),
+        col("value.CUSTOMER_ID_MAX_AMOUNT_1DAY_WINDOW").alias("CUSTOMER_ID_MAX_AMOUNT_1DAY_WINDOW"),
+        col("value.CUSTOMER_ID_MAX_AMOUNT_7DAY_WINDOW").alias("CUSTOMER_ID_MAX_AMOUNT_7DAY_WINDOW"),
+        col("value.CUSTOMER_ID_MAX_AMOUNT_1DAY_WINDOW").alias("CUSTOMER_ID_MAX_AMOUNT_30DAY_WINDOW")
     ))
+    pipelineModel = CrossValidatorModel.read().load("models/cv-random-forest-roc")
 
-    pipelineModel = PipelineModel.load("models/random-forrest")
-
-    results = pipelineModel.transform(df_formatted).writeStream.format("console")\
+    results = pipelineModel.transform(df_formatted).writeStream.format("parquet") \
+        .option("path", 'evaluated-data/dataset') \
+        .option("checkpointLocation", 'evaluated-data/dataset-checkpoint') \
+        .outputMode("append") \
         .start().awaitTermination()
-
