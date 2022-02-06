@@ -1,6 +1,5 @@
 import os
-
-import tqdm as tqdm
+import time
 
 os.chdir("../")
 print(os.listdir())
@@ -30,6 +29,5 @@ if __name__ == '__main__':
             else:
                 producer.send('transactions', message)
                 print(f"message-{index} successfully sent")
-                sleep(0.3)
     except KeyboardInterrupt:
         print("process interrupted")
